@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ZCode 清理器</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --border:#2a2f3a;
+    --text:#e6e9ef; --dim:#8b93a3; --accent:#4f8cff; --accent2:#3b6fd4;
+    --green:#3fb96f; --red:#e5534b; --amber:#d9a03c;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); min-height:100vh; font:14px/1.6 "Segoe UI","Microsoft YaHei",system-ui,sans-serif; padding:18px 20px 20px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  header h1 { font-size:19px; font-weight:600; }
+  header .path { color:var(--dim); font-size:12px; }
+  header .spacer { flex:1; }
+  #scanState { color:var(--dim); font-size:12px; }
+  button { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 14px; cursor:pointer; font-size:13px; }
+  button:hover { border-color:var(--accent); }
+  button.danger { background:transparent; border-color:var(--red); color:var(--red); }
+  button.danger:hover { background:var(--red); color:#fff; }
+  button.warn { background:transparent; border-color:var(--amber); color:var(--amber); }
+  button.warn:hover { background:var(--amber); color:#111; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  select, input[type=search] { background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:13px; }
+  label.switch { display:inline-flex; align-items:center; gap:6px; color:var(--dim); font-size:13px; cursor:pointer; user-select:none; }
+  label.switch input { accent-color:var(--accent); }
+
+  .chips { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+  .chip { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 16px; }
+  .chip .label { color:var(--dim); font-size:12px; }
+  .chip .value { font-size:20px; font-weight:600; margin-top:2px; }
+  .chip .sub { color:var(--dim); font-size:11px; }
+  .chip .value small { font-size:12px; font-weight:400; color:var(--dim); }
+
+  #banner { background:#2a2416; border:1px solid var(--amber); color:var(--amber); border-radius:8px; padding:7px 14px; font-size:13px; margin-bottom:12px; display:none; }
+
+  .policybar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:9px 14px; margin-bottom:12px; }
+  .policybar .sep { color:var(--border); }
+  .policybar b { font-weight:600; }
+
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:12px; }
+  .tabs button { background:none; border:none; border-bottom:2px solid transparent; border-radius:0; padding:7px 18px; color:var(--dim); font-size:14px; }
+  .tabs button.active { color:var(--text); border-bottom-color:var(--accent); }
+
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  th, td { padding:7px 12px; text-align:left; border-bottom:1px solid var(--border); font-size:13px; }
+  th { color:var(--dim); font-weight:500; background:var(--panel2); }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#1c2029; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .s-title { font-weight:500; }
+  .s-dir { color:var(--dim); font-size:11px; font-family:Consolas,monospace; }
+  .s-id { color:var(--dim); font-size:11px; font-family:Consolas,monospace; }
+  .badge { display:inline-block; background:var(--panel2); border:1px solid var(--border); border-radius:4px; padding:0 6px; font-size:11px; color:var(--dim); margin-right:4px; }
+  .tag { display:inline-block; border-radius:4px; padding:0 6px; font-size:11px; }
+  .tag.active { background:#2a1e1c; color:var(--red); border:1px solid var(--red); }
+  .tag.protected { background:#2a2416; color:var(--amber); border:1px solid var(--amber); }
+  .tag.overdue { background:#16241b; color:var(--green); border:1px solid #2c523c; }
+  .tag.dbonly { background:#1a2230; color:#7aa5e8; border:1px solid #2c4a78; }
+  .tag.orphan { background:#241a2a; color:#c07ae8; border:1px solid #4a2c78; }
+  .bar { height:4px; border-radius:2px; background:var(--panel2); overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+
+  .cache-row { display:flex; align-items:center; gap:14px; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:13px 16px; margin-bottom:10px; }
+  .cache-row .info { flex:1; min-width:0; }
+  .cache-row .name { font-weight:600; }
+  .cache-row .p { color:var(--dim); font-size:12px; }
+  .cache-row .size { font-size:18px; font-weight:600; white-space:nowrap; }
+
+  #toasts { position:fixed; top:14px; right:14px; z-index:99; display:flex; flex-direction:column; gap:8px; }
+  .toast { background:var(--panel2); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:8px; padding:10px 14px; font-size:13px; max-width:460px; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+  .toast.err { border-left-color:var(--red); }
+  .toast.ok { border-left-color:var(--green); }
+  .muted { color:var(--dim); }
+  .hidden { display:none !important; }
+
+  .modal-mask { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal-mask.show { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--red); border-radius:12px; padding:22px; width:500px; max-width:92vw; }
+  .modal h3 { margin-bottom:10px; font-size:16px; color:var(--red); }
+  .modal .detail { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 12px; max-height:230px; overflow:auto; font-size:12px; color:var(--dim); margin-bottom:12px; }
+  .modal .warn-line { color:var(--amber); font-size:12px; margin-bottom:14px; }
+  .modal .actions { display:flex; justify-content:flex-end; gap:10px; }
+
+  .busy-mask { position:fixed; inset:0; background:rgba(10,12,16,.72); display:none; align-items:center; justify-content:center; z-index:200; }
+  .busy-mask.show { display:flex; }
+  .busy-box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:26px 34px; text-align:center; min-width:300px; max-width:80vw; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+  .spinner { width:34px; height:34px; margin:0 auto 12px; border-radius:50%; border:3px solid var(--panel2); border-top-color:var(--accent); animation:spin .9s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #busyText { font-size:13px; word-break:break-all; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>ZCode 清理器</h1>
+    <span class="path" id="rootPath"></span>
+    <span class="spacer"></span>
+    <span id="scanState"></span>
+    <button onclick="refresh(true)">重新扫描</button>
+  </header>
+
+  <div id="banner">⚠ 检测到 ZCode 可能正在运行（数据库最近有写入）。删除会话数据通常没问题，但「数据库瘦身」建议先退出所有 ZCode 实例再执行。</div>
+
+  <div class="chips">
+    <div class="chip"><div class="label">.zcode 总占用</div><div class="value" id="cTotal">–</div><div class="sub" id="cTotalSub"></div></div>
+    <div class="chip"><div class="label">会话数据</div><div class="value" id="cSession">–</div><div class="sub" id="cSessionSub"></div></div>
+    <div class="chip"><div class="label">会话数据库（索引+历史）</div><div class="value" id="cDb">–</div><div class="sub">含消息正文，删除会话后可瘦身 <button class="warn" style="padding:2px 8px;font-size:11px" onclick="doVacuum()">VACUUM 瘦身</button></div></div>
+    <div class="chip"><div class="label">可清理缓存</div><div class="value" id="cCache">–</div><div class="sub">日志 / 插件缓存 / 崩溃转储</div></div>
+  </div>
+
+  <div class="policybar">
+    <b>保留策略</b>
+    <span class="sep">|</span>
+    <span>会话保留最近</span>
+    <select id="sessKeepDays" onchange="onPolicyChange()">
+      <option value="7">7 天</option><option value="14">14 天</option>
+      <option value="30" selected>30 天</option><option value="90">90 天</option>
+      <option value="180">180 天</option><option value="365">365 天</option>
+      <option value="0">全部保留（仅手动）</option>
+    </select>
+    <span>日志保留最近</span>
+    <select id="logKeepDays" onchange="onPolicyChange()">
+      <option value="0">0 天（全删）</option><option value="3">3 天</option>
+      <option value="7" selected>7 天</option><option value="14">14 天</option>
+      <option value="30">30 天</option>
+    </select>
+    <label class="switch"><input type="checkbox" id="protectChk" checked onchange="onPolicyChange()"> 保护近 24h 活跃会话</label>
+    <span class="spacer" style="flex:1"></span>
+    <span class="muted" id="policySummary"></span>
+    <button class="danger" id="policyBtn" onclick="policyClean()">按策略清理</button>
+  </div>
+
+  <div class="tabs">
+    <button id="tabSessions" class="active" onclick="switchTab('sessions')">会话清理</button>
+    <button id="tabCaches" onclick="switchTab('caches')">缓存清理</button>
+  </div>
+
+  <div id="viewSessions">
+    <div class="policybar" style="padding:7px 14px">
+      <input type="search" id="searchBox" placeholder="搜索标题 / 目录 / 会话 ID…" style="width:280px" oninput="renderSessions()">
+      <span class="spacer" style="flex:1"></span>
+      <button onclick="selectAllFiltered(true)">全选可见</button>
+      <button onclick="selectAllFiltered(false)">取消全选</button>
+      <button class="danger" id="delSessionsBtn" onclick="askDeleteSessions()" disabled>删除所选</button>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:34px"></th>
+        <th>会话</th>
+        <th style="width:100px" class="num">磁盘占用</th><th style="width:84px">占比</th>
+        <th style="width:100px">最后活动</th><th style="width:150px">状态</th>
+      </tr></thead>
+      <tbody id="sessionRows"></tbody>
+    </table>
+    <p class="muted" style="margin-top:8px;font-size:12px">
+      删除会话 = 磁盘文件（转录/产物/Shell快照/模型IO/图片缓存）+ 数据库索引与全部消息历史一并永久删除，不可恢复。
+    </p>
+  </div>
+
+  <div id="viewCaches" class="hidden">
+    <div class="policybar" style="padding:7px 14px">
+      <span class="muted">日志只清理超出「保留策略」天数的文件，要全部清理请把日志保留设为 0 天</span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="danger" id="delCachesBtn" onclick="askDeleteCaches()" disabled>清理所选</button>
+    </div>
+    <div id="cacheList"></div>
+    <p class="muted" style="margin-top:8px;font-size:12px">日志按上方「保留策略」中的天数执行；插件缓存清理后 ZCode 会按需重新下载。</p>
+  </div>
+</div>
+
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3>⚠ 永久删除确认</h3>
+    <div class="detail" id="modalDetail"></div>
+    <p class="warn-line">此操作直接删除、不经过回收站，无法恢复。会话删除将同时清除数据库中的索引与消息历史。</p>
+    <div class="actions">
+      <button onclick="closeModal()">取消</button>
+      <button class="danger" id="modalConfirm">永久删除（不可恢复）</button>
+    </div>
+  </div>
+</div>
+
+<div class="busy-mask" id="busyMask">
+  <div class="busy-box"><div class="spinner"></div><div id="busyText">处理中…</div></div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+const inv = window.__TAURI__.core.invoke;
+let DATA = null, SETTINGS = null;
+let selectedSessions = new Set(), selectedCaches = new Set();
+const $ = id => document.getElementById(id);
+
+const fmtSize = n => n == null ? '–' : n < 1024 ? n + ' B'
+  : (n /= 1024) < 1024 ? n.toFixed(1) + ' KB'
+  : (n /= 1024) < 1024 ? n.toFixed(1) + ' MB'
+  : (n / 1024).toFixed(2) + ' GB';
+const fmtAge = ms => { const d = (Date.now() - ms) / 86400000;
+  return d < 1/24 ? '刚刚' : d < 1 ? Math.round(d*24)+' 小时前' : d < 30 ? Math.round(d)+' 天前' : Math.round(d/30)+' 个月前'; };
+function toast(msg, cls='') {
+  const el = document.createElement('div'); el.className = 'toast ' + cls; el.textContent = msg;
+  $('toasts').appendChild(el); setTimeout(() => el.remove(), 7000);
+}
+
+// ---------- 忙碌状态与进度 ----------
+function setBusy(on, text) {
+  $('busyMask').classList.toggle('show', !!on);
+  if (text) $('busyText').textContent = text;
+}
+try {
+  window.__TAURI__.event.listen('progress', e => {
+    const p = e.payload || {};
+    if ($('busyMask').classList.contains('show') && p.message)
+      $('busyText').textContent = p.message;
+  });
+} catch {}
+
+// ---------- 启动 ----------
+(async function init() {
+  try { SETTINGS = await inv('load_settings'); } catch { SETTINGS = null; }
+  SETTINGS = Object.assign({ sessionKeepDays: 30, logKeepDays: 7, cleanPluginCache: false, cleanCrash: true, protectActive: true }, SETTINGS || {});
+  $('sessKeepDays').value = String(SETTINGS.sessionKeepDays);
+  $('logKeepDays').value = String(SETTINGS.logKeepDays);
+  $('protectChk').checked = SETTINGS.protectActive;
+  refresh(true);
+})();
+
+let saveTimer = null;
+function persistSettings() {
+  SETTINGS.sessionKeepDays = +$('sessKeepDays').value;
+  SETTINGS.logKeepDays = +$('logKeepDays').value;
+  SETTINGS.protectActive = $('protectChk').checked;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => inv('save_settings', { settings: SETTINGS }).catch(e => toast('保存设置失败: ' + e, 'err')), 400);
+}
+
+async function refresh(force = false) {
+  if (force) setBusy(true, '正在扫描…');
+  $('scanState').textContent = '扫描中…';
+  try {
+    DATA = await inv('scan', { computeTotal: force === true });
+    $('scanState').textContent = '扫描于 ' + new Date().toLocaleTimeString();
+    render();
+  } catch (e) { $('scanState').textContent = ''; toast('扫描失败: ' + e, 'err'); }
+  finally { if (force) setBusy(false); }
+}
+function render() {
+  $('rootPath').textContent = DATA.root;
+  $('banner').style.display = DATA.dbBusyHint ? 'block' : 'none';
+  const cacheTotal = DATA.caches.reduce((s, c) => s + c.totalSize, 0);
+  const sessionDisk = DATA.sessions.reduce((s, x) => s + x.diskSize, 0);
+  const dbOnly = DATA.sessions.filter(s => s.dbOnly).length;
+  $('cTotal').textContent = fmtSize(DATA.totalSize);
+  $('cTotalSub').textContent = '会话磁盘 ' + fmtSize(sessionDisk) + (dbOnly ? ` · ${dbOnly} 条仅存数据库` : '');
+  $('cSession').textContent = String(DATA.sessions.length);
+  $('cSession').innerHTML = DATA.sessions.length + ' <small>个</small>';
+  $('cSessionSub').textContent = '数据库记录 ' + DATA.dbSessionCount + ' 条';
+  $('cDb').textContent = fmtSize(DATA.dbSize);
+  $('cCache').textContent = fmtSize(cacheTotal);
+  if (DATA.dbError) toast('数据库读取异常: ' + DATA.dbError, 'err');
+  applyPolicySelection(false);
+  // 缓存勾选按设置/策略预选
+  selectedCaches = new Set();
+  for (const c of DATA.caches) {
+    if (c.kind === 'dated-log' && eligibleSize(c) > 0) selectedCaches.add(c.key);
+    if (c.key === 'crash' && SETTINGS.cleanCrash) selectedCaches.add(c.key);
+    if (c.key === 'plugin-cache' && SETTINGS.cleanPluginCache) selectedCaches.add(c.key);
+  }
+  renderSessions();
+  renderCaches();
+}
+function switchTab(t) {
+  $('tabSessions').classList.toggle('active', t === 'sessions');
+  $('tabCaches').classList.toggle('active', t === 'caches');
+  $('viewSessions').classList.toggle('hidden', t !== 'sessions');
+  $('viewCaches').classList.toggle('hidden', t !== 'caches');
+}
+
+// ---------- 会话 ----------
+function filtered() {
+  const q = $('searchBox').value.trim().toLowerCase();
+  return DATA.sessions.filter(s => !q
+    || s.id.toLowerCase().includes(q)
+    || (s.title || '').toLowerCase().includes(q)
+    || (s.directory || '').toLowerCase().includes(q));
+}
+function applyPolicySelection(reset) {
+  if (!DATA) return;
+  const keep = +$('sessKeepDays').value, protect = $('protectChk').checked;
+  if (reset || selectedSessions.size === 0) {
+    selectedSessions = new Set();
+    if (keep > 0) {
+      const cutoff = Date.now() - keep * 86400000;
+      for (const s of DATA.sessions)
+        if (s.timeUpdated < cutoff && !(protect && s.protected)) selectedSessions.add(s.id);
+    }
+  }
+  updateDelBtn();
+}
+function onPolicyChange() {
+  persistSettings();
+  applyPolicySelection(true);
+  renderSessions();
+  renderCaches();
+}
+function statusTags(s) {
+  const out = [];
+  const active = s.timeUpdated > Date.now() - 10 * 60000;
+  if (active) out.push('<span class="tag active">活跃</span>');
+  else if ($('protectChk').checked && s.protected) out.push('<span class="tag protected">保护中</span>');
+  const keep = +$('sessKeepDays').value;
+  if (keep > 0 && s.timeUpdated < Date.now() - keep * 86400000 && !active) out.push('<span class="tag overdue">超出保留期</span>');
+  if (s.dbOnly) out.push('<span class="tag dbonly" title="磁盘无文件，删除仅清数据库记录">仅数据库</span>');
+  if (s.orphan) out.push('<span class="tag orphan" title="数据库无记录">无索引</span>');
+  return out.join(' ');
+}
+function renderSessions() {
+  const rows = filtered(), max = Math.max(...DATA.sessions.map(s => s.diskSize), 1);
+  $('sessionRows').innerHTML = rows.map(s => {
+    const locked = $('protectChk').checked && s.protected && !s.dbOnly;
+    if (locked) selectedSessions.delete(s.id);
+    const checked = selectedSessions.has(s.id) && !locked;
+    return `<tr>
+      <td><input type="checkbox" data-ss="${s.id}" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} onchange="pickSession(this)"></td>
+      <td><div class="s-title">${esc(s.title || '（无标题会话）')}</div>
+          <div class="s-dir">${esc(s.directory || '')} ${s.dbOnly ? '' : ' · ' + s.id.slice(0, 20) + '…'}</div></td>
+      <td class="num">${s.dbOnly ? '<span class="muted">无文件</span>' : fmtSize(s.diskSize)}</td>
+      <td><div class="bar"><i style="width:${(s.diskSize / max * 100).toFixed(1)}%"></i></div></td>
+      <td title="${new Date(s.timeUpdated).toLocaleString()}">${s.timeUpdated ? fmtAge(s.timeUpdated) : '–'}</td>
+      <td>${statusTags(s)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px">没有匹配的会话</td></tr>';
+  updateDelBtn();
+}
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function pickSession(el) { el.checked ? selectedSessions.add(el.dataset.ss) : selectedSessions.delete(el.dataset.ss); updateDelBtn(); }
+function selectAllFiltered(all) {
+  for (const s of filtered()) {
+    const locked = $('protectChk').checked && s.protected && !s.dbOnly;
+    if (locked) continue;
+    all ? selectedSessions.add(s.id) : selectedSessions.delete(s.id);
+  }
+  renderSessions();
+}
+function updateDelBtn() {
+  const items = DATA ? DATA.sessions.filter(s => selectedSessions.has(s.id)) : [];
+  const bytes = items.reduce((a, s) => a + s.diskSize, 0);
+  $('delSessionsBtn').disabled = !items.length;
+  $('delSessionsBtn').textContent = items.length ? `删除所选（${items.length} 项 / ${fmtSize(bytes)}）` : '删除所选';
+  $('policyBtn').textContent = `按策略清理${selectedSessions.size ? `（已预选 ${selectedSessions.size} 项）` : ''}`;
+}
+
+// ---------- 缓存 ----------
+function eligibleSize(c) {
+  if (c.kind !== 'dated-log' || !c.files) return c.totalSize;
+  const cutoff = Date.now() - (+$('logKeepDays').value) * 86400000;
+  return c.files.filter(f => f.mtime <= cutoff).reduce((s, f) => s + f.size, 0);
+}
+function renderCaches() {
+  $('cacheList').innerHTML = DATA.caches.map(c => {
+    const cleanable = eligibleSize(c);
+    const checked = selectedCaches.has(c.key);
+    const note = !c.files ? '' : cleanable > 0
+      ? ` · 共 ${c.files.length} 个文件 · 按当前保留天数可清 ${fmtSize(cleanable)}`
+      : ` · 共 ${c.files.length} 个文件，均在保留期内（保留 ${$('logKeepDays').value} 天）——要全清请把保留天数设为 0`;
+    return `<div class="cache-row">
+      <input type="checkbox" data-cc="${c.key}" ${checked ? 'checked' : ''} ${c.totalSize === 0 ? 'disabled' : ''}
+             onchange="pickCache(this)">
+      <div class="info">
+        <div class="name">${c.name} <span class="badge">${c.path}</span></div>
+        <div class="p">${c.note}${note}</div>
+      </div>
+      <div class="size">${fmtSize(c.totalSize)}</div>
+    </div>`;
+  }).join('') + `<div class="cache-row" style="opacity:.65">
+      <input type="checkbox" disabled>
+      <div class="info"><div class="name">会话数据库 <span class="badge">cli/db/db.sqlite</span></div>
+      <div class="p">删除会话时已同步清空其中记录；文件体积需点上方「VACUUM 瘦身」归还磁盘</div></div>
+      <div class="size">${fmtSize(DATA.dbSize)}</div>
+    </div>`;
+  updateCacheBtn();
+}
+function updateCacheBtn() {
+  const n = selectedCaches.size;
+  const bytes = DATA.caches.filter(c => selectedCaches.has(c.key)).reduce((a, c) => a + eligibleSize(c), 0);
+  $('delCachesBtn').disabled = n === 0;
+  $('delCachesBtn').textContent = n === 0 ? '清理所选'
+    : bytes > 0 ? `清理所选（约 ${fmtSize(bytes)}）`
+    : '清理所选（当前保留天数下 0 B）';
+}
+function pickCache(el) {
+  el.checked ? selectedCaches.add(el.dataset.cc) : selectedCaches.delete(el.dataset.cc);
+  updateCacheBtn();
+}
+function askDeleteCaches() {
+  const keys = [...selectedCaches];
+  if (!keys.length) return;
+  const items = DATA.caches.filter(c => selectedCaches.has(c.key));
+  const bytes = items.reduce((a, c) => a + eligibleSize(c), 0);
+  if (bytes === 0)
+    return toast('所选日志在当前保留天数下没有可清文件；要全部清理请把上方「保留策略」中的日志保留设为 0 天', 'err');
+  showModal(
+    `清理 ${keys.length} 类缓存（约 ${fmtSize(bytes)}）：` +
+    items.map(c => `<br>· ${c.name}（${c.path}）· 约 ${fmtSize(eligibleSize(c))}`).join(''),
+    () => doClean([], keys, +$('logKeepDays').value));
+}
+
+// ---------- 清理执行 ----------
+let pendingAction = null;
+function showModal(html, onConfirm) {
+  $('modalDetail').innerHTML = html; pendingAction = onConfirm; $('modalMask').classList.add('show');
+}
+function closeModal() { $('modalMask').classList.remove('show'); pendingAction = null; }
+function askDeleteSessions() {
+  const items = DATA.sessions.filter(s => selectedSessions.has(s.id));
+  if (!items.length) return;
+  const bytes = items.reduce((a, s) => a + s.diskSize, 0);
+  const withDb = items.filter(s => !s.orphan).length;
+  showModal(
+    `删除 ${items.length} 个会话（磁盘 ${fmtSize(bytes)}）：` +
+    items.slice(0, 200).map(s => `<br>· ${esc(s.title || s.id)} · ${fmtSize(s.diskSize)} · ${fmtAge(s.timeUpdated)}`).join('') +
+    (items.length > 200 ? '<br>…' : '') +
+    (withDb ? `<br><br>其中 ${withDb} 个将同步删除数据库索引与消息历史` : ''),
+    () => doDelete([...selectedSessions]));
+}
+async function policyClean() {
+  // 会话：已按策略预选；缓存：日志按保留天数 + 崩溃转储(按设置)
+  const caches = [];
+  for (const c of DATA.caches) {
+    if (c.kind === 'dated-log' && eligibleSize(c) > 0) caches.push(c.key);
+    if (c.key === 'crash' && SETTINGS.cleanCrash && c.totalSize > 0) caches.push(c.key);
+    if (c.key === 'plugin-cache' && SETTINGS.cleanPluginCache && c.totalSize > 0) caches.push(c.key);
+  }
+  const ids = [...selectedSessions];
+  if (!ids.length && !caches.length) return toast('当前策略下没有需要清理的内容', 'err');
+  const sessBytes = DATA.sessions.filter(s => selectedSessions.has(s.id)).reduce((a, s) => a + s.diskSize, 0);
+  const cacheBytes = DATA.caches.filter(c => caches.includes(c.key)).reduce((a, c) => a + eligibleSize(c), 0);
+  showModal(
+    `按当前保留策略清理：<br><br>` +
+    `· 会话 ${ids.length} 个（磁盘 ${fmtSize(sessBytes)}${ids.length ? '，含数据库索引与历史' : ''}）` +
+    (caches.length ? `<br>· 缓存：${caches.join('、')}（约 ${fmtSize(cacheBytes)}）` : ''),
+    () => doClean(ids, caches, +$('logKeepDays').value));
+}
+async function doDelete(ids) {
+  closeModal();
+  setBusy(true, `正在删除 ${ids.length} 个会话…`);
+  try {
+    const r = await inv('delete_sessions', { ids, force: !$('protectChk').checked });
+    let msg = `已删除 ${r.deleted} 个会话，释放磁盘 ${fmtSize(r.freedDisk)}，清除数据库记录 ${r.dbRowsDeleted} 条`;
+    if (r.skipped.length) msg += `；跳过 ${r.skipped.length} 项`;
+    toast(msg, r.errors.length ? 'err' : 'ok');
+    r.errors.forEach(e => toast(e, 'err'));
+    if (DATA.dbBusyHint) toast('检测到 ZCode 正在运行：重启 ZCode 后其会话列表才会刷新', '');
+    selectedSessions.clear();
+    await refresh(false);
+  } catch (e) { toast('删除失败: ' + e, 'err'); }
+  finally { setBusy(false); }
+}
+async function doClean(ids, caches, keepDays) {
+  closeModal();
+  setBusy(true, '正在清理…');
+  try {
+    let msgs = [];
+    if (caches.length) {
+      const r = await inv('clean_caches', { keys: caches, keepDays });
+      msgs.push(`缓存：删除 ${r.deletedFiles} 个文件，释放 ${fmtSize(r.freedDisk)}`);
+      if (r.errors.length) r.errors.forEach(e => toast('缓存: ' + e, 'err'));
+    }
+    if (ids.length) {
+      const r = await inv('delete_sessions', { ids, force: !$('protectChk').checked });
+      msgs.push(`会话：删除 ${r.deleted} 个，释放 ${fmtSize(r.freedDisk)}，数据库记录 ${r.dbRowsDeleted} 条`);
+      if (r.skipped.length) msgs.push(`跳过 ${r.skipped.length} 项（活跃保护）`);
+      selectedSessions.clear();
+    }
+    toast(msgs.join('；'), 'ok');
+    if (DATA.dbBusyHint) toast('检测到 ZCode 正在运行：重启 ZCode 后其会话列表才会刷新', '');
+    await refresh(false);
+  } catch (e) { toast('清理失败: ' + e, 'err'); }
+  finally { setBusy(false); }
+}
+async function doVacuum() {
+  if (DATA.dbBusyHint && !confirm('ZCode 可能正在运行，VACUUM 可能失败。继续？')) return;
+  setBusy(true, '正在瘦身数据库…（820MB 级别可能需要几十秒，界面不会卡住）');
+  try {
+    const r = await inv('vacuum_db');
+    toast(`数据库已瘦身：${fmtSize(r.before)} → ${fmtSize(r.after)}（释放 ${fmtSize(r.before - r.after)}）`, 'ok');
+    await refresh(false);
+  } catch (e) { toast('瘦身失败: ' + e, 'err'); }
+  finally { setBusy(false); }
+}
+
+$('modalMask').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+$('modalConfirm').addEventListener('click', () => {
+  const act = pendingAction;
+  closeModal();
+  if (act) act();
+});
+</script>
+</body>
+</html>
